@@ -55,8 +55,8 @@ fn readLZ4Header(reader: anytype, comptime verify_checksums: bool) !Frame.LZ4.He
     }
 
     // Struct field order is not guarunteed.
-    const content_size = if (descriptor.content_size) try reader.readIntLittle(u64) else 0;
-    const dictionary_id = if (descriptor.dict_id) try reader.readIntLittle(u32) else 0;
+    const content_size = if (descriptor.content_size) try reader.readInt(u64, .little) else 0;
+    const dictionary_id = if (descriptor.dict_id) try reader.readInt(u32, .little) else 0;
 
     const expected_checksum = try reader.readByte();
     // Official implementation only checks checksums in testing mode.
@@ -101,21 +101,21 @@ test "xxhash" {
 }
 
 fn readFrameHeader(reader: anytype, comptime verify_checksums: bool) !FrameHeader {
-    const magic = try reader.readIntLittle(u32);
+    const magic = try reader.readInt(u32, .little);
     const frame_type = try frameType(magic);
     return switch (frame_type) {
         .lz4 => FrameHeader{ .lz4 = try readLZ4Header(reader, verify_checksums) },
         .skippable => FrameHeader{
             .skippable = .{
                 .magic_number = magic,
-                .frame_size = try reader.readIntLittle(u32),
+                .frame_size = try reader.readInt(u32, .little),
             },
         },
     };
 }
 
 fn readDataBlockChecksum(reader: anytype, data: []const u8, comptime verify_checksums: bool) !void {
-    const expected_checksum = try reader.readIntLittle(u32);
+    const expected_checksum = try reader.readInt(u32, .little);
     if (verify_checksums) {
         const actual_checksum = Hasher.hash(0, data);
         if (expected_checksum != actual_checksum) {
@@ -192,7 +192,7 @@ pub fn decode(allocator: Allocator, reader: anytype, comptime verify_checksums: 
             }
 
             if (header.descriptor.content_checksum and verify_checksums) {
-                const expected_checksum = try reader.readIntLittle(u32);
+                const expected_checksum = try reader.readInt(u32, .little);
                 const actual_checksum = Hasher.hash(0, decoded.items);
                 if (expected_checksum != actual_checksum) {
                     log.warn("expected content checksum {x} from frame, got {x}", .{ expected_checksum, actual_checksum });
@@ -219,7 +219,7 @@ test "read compressed frame" {
     const allocator = std.testing.allocator;
 
     var stream = std.io.fixedBufferStream(src);
-    var reader = stream.reader();
+    const reader = stream.reader();
     const decompressed = try decode(allocator, reader, true);
     defer allocator.free(decompressed);
 
@@ -240,7 +240,7 @@ test "read two frames" {
     const allocator = std.testing.allocator;
 
     var stream = std.io.fixedBufferStream(src);
-    var reader = stream.reader();
+    const reader = stream.reader();
     const decompressed = try decode(allocator, reader, true);
     defer allocator.free(decompressed);
 
@@ -258,6 +258,6 @@ test "bad frames don't leak memory" {
     const allocator = std.testing.allocator;
 
     var stream = std.io.fixedBufferStream(src);
-    var reader = stream.reader();
+    const reader = stream.reader();
     try std.testing.expectError(error.BadMatchOffset, decode(allocator, reader, true));
 }

@@ -58,21 +58,21 @@ fn decodeBlockStream(dest: *std.ArrayList(u8), reader: anytype) !void {
     const token = try reader.readStruct(Token);
     log.debug("token {any}", .{token});
 
-    var literal_len = try readLength(token.literal_len, reader);
+    const literal_len = try readLength(token.literal_len, reader);
     log.debug("literal len {d}", .{literal_len});
     const old_len = dest.items.len;
     try dest.resize(old_len + literal_len);
 
     // Read literals into destination buffer.
-    var literals = dest.items[old_len..dest.items.len];
+    const literals = dest.items[old_len..dest.items.len];
     const n_read = try reader.read(literals);
     if (literal_len != n_read) {
-        log.err("premature stream end. expected {d} literals but got {d}", .{ literal_len, n_read });
+        log.warn("premature stream end. expected {d} literals but got {d}", .{ literal_len, n_read });
         return DecodeError.PrematureEnd;
     }
 
     // Read match offset and check for EOF
-    const match_offset = reader.readIntLittle(Offset) catch |err| {
+    const match_offset = reader.readInt(Offset, .little) catch |err| {
         if (err == error.EndOfStream) return;
         return err;
     };
@@ -82,7 +82,7 @@ fn decodeBlockStream(dest: *std.ArrayList(u8), reader: anytype) !void {
     const abs_offset = if (std.math.sub(usize, dest.items.len, match_offset)) |res|
         res
     else |_| {
-        log.err("match_offset {d} points to {d} bytes before buffer start", .{
+        log.warn("match_offset {d} points to {d} bytes before buffer start", .{
             match_offset,
             @as(i64, @intCast(dest.items.len)) - @as(i64, @intCast(match_offset)),
         });
@@ -94,7 +94,7 @@ fn decodeBlockStream(dest: *std.ArrayList(u8), reader: anytype) !void {
     const old_len2 = dest.items.len;
     try dest.resize(old_len2 + len);
     if (abs_offset + len > dest.items.len) {
-        log.err("match references bytes {d}..{d} which are after dest size {d}", .{ abs_offset, abs_offset + len, dest.items.len });
+        log.warn("match references bytes {d}..{d} which are after dest size {d}", .{ abs_offset, abs_offset + len, dest.items.len });
         return DecodeError.BadMatchLen;
     }
 
@@ -104,7 +104,7 @@ fn decodeBlockStream(dest: *std.ArrayList(u8), reader: anytype) !void {
 /// Decodes an LZ4 block into its data using allocator. Caller owns returned slice.
 pub fn decode(allocator: Allocator, src: []const u8) ![]u8 {
     var stream = std.io.fixedBufferStream(src);
-    var reader = stream.reader();
+    const reader = stream.reader();
 
     var dest = std.ArrayList(u8).init(allocator);
     errdefer dest.deinit();
@@ -117,7 +117,7 @@ pub fn decode(allocator: Allocator, src: []const u8) ![]u8 {
 /// Decodes an LZ4 block into *std.ArrayList(u8). Returns the number of decoded bytes.
 pub fn decodeArrayList(dest: *std.ArrayList(u8), src: []const u8) !usize {
     var stream = std.io.fixedBufferStream(src);
-    var reader = stream.reader();
+    const reader = stream.reader();
 
     while (reader.context.pos < src.len) try decodeBlockStream(dest, reader);
 

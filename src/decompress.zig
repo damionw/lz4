@@ -52,7 +52,7 @@ pub fn DecompressStream(
             if (buffer.len > len) {
                 self.data = frame.decode(self.allocator, self.source, verify_checksums) catch |err| {
                     if (err == error.EndOfStream) return len;
-                    return @as(Error, @errSetCast(err));
+                    return @as(Error, @errorCast(err));
                 };
                 return try self.read(buffer[len..]);
             }
@@ -77,7 +77,7 @@ fn testDecompress(comptime fname: []const u8) !void {
     defer allocator.free(expected);
 
     var file = try std.fs.cwd().openFile(fname ++ ".lz4", .{});
-    var reader = file.reader();
+    const reader = file.reader();
     var stream = decompressStream(std.testing.allocator, reader, true);
     defer stream.deinit();
     var lz4reader = stream.reader();
