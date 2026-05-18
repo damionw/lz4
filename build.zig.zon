@@ -8,5 +8,5 @@
         "LICENSE",
         "README.md",
     },
-    .fingerprint = 0x4ae88e9f50c9c5e8
+    .fingerprint = 0x4ae88e9f877e1267,
 }
